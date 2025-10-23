@@ -36,7 +36,8 @@ fn vs_main(
 
     // TODO: MVP calculations
     // WAHOOO
-    out.position = camera.view * camera.proj * pos;
+    let projPoz = camera.proj * camera.view *  pos;
+    out.position = projPoz / projPoz.w;
 
     return out;
 }
