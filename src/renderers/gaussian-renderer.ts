@@ -63,20 +63,46 @@ export default function get_renderer(
     ],
   });
 
-
   // ===============================================
-  //    Create Render Pipeline and Bind Groups
+  //    TODO: Create Render Pipeline and Bind Groups
+  // =============================================== 
+
+  const render_pipeline = device.createRenderPipeline({
+    label: "gauss render pipeline",
+    layout: 'auto',
+    vertex: {
+      module: device.createShaderModule({
+        label: "gauss vertex shader",
+        code: renderWGSL
+      }),
+      entryPoint: 'vs_main', 
+      buffers: [ /* YA NEED TO ADD BUFFERS */]
+    },
+    fragment: {
+      module: device.createShaderModule({
+        label: "gauss frag shader",
+        code: renderWGSL
+      }),
+      entryPoint: 'fs_main', 
+      targets: [{
+        format: presentation_format,
+      }]
+    },
+    depthStencil: {
+      format: 'depth24plus',
+      depthWriteEnabled: true
+    }
+  });
+  
+  // ===============================================
+  //    TODO: Command Encoder Functions
   // ===============================================
   
 
   // ===============================================
-  //    Command Encoder Functions
+  //    TODO: Return Render Object
   // ===============================================
-  
 
-  // ===============================================
-  //    Return Render Object
-  // ===============================================
   return {
     frame: (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
       sorter.sort(encoder);
