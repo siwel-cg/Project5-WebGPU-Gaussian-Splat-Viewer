@@ -112,6 +112,14 @@ fn computeColorFromSH(dir: vec3<f32>, v_idx: u32, sh_deg: u32) -> vec3<f32> {
 fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) wgs: vec3<u32>) {
     let idx = gid.x;
     //TODO: set up pipeline as described in instruction
+    
+    // - Implement view frustum culling to remove non-visible Gaussians (make bounding box to be slightly larger to keep the edge gaussians)
+    // - Compute 3D covariance based on rotation and scale, also user inputted gaussian multipler. (see post on 1.1 section)
+    // - Compute 2D conic, maximum radius, and maximum quad size in NDC (see post on 1.1 section)
+    // - Using spherical harmonics coeffiecients to evaluate the color of the gaussian from particular view direction (evaluation function is provided, see post ).
+    // - Store essential 2D gaussian data for later rasteriation pipeline
+    // - Add key_size, indices, and depth to sorter.
+    
 
     let keys_per_dispatch = workgroupSize * sortKeyPerThread; 
     // increment DispatchIndirect.dispatchx each time you reach limit for one dispatch of keys
