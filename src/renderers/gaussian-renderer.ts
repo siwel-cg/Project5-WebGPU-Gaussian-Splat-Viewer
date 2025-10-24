@@ -111,7 +111,6 @@ export default function get_renderer(
     ],
   });
 
-
   // WE MAKING THE QUAD SETUP HERE: \(^u^)/
 
   const quadOffset = new Float32Array([
