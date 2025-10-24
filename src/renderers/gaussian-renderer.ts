@@ -76,7 +76,13 @@ export default function get_renderer(
         label: "gauss vertex shader",
         code: renderWGSL
       }),
-      entryPoint: 'vs_main'
+      entryPoint: 'vs_main',
+      buffers: [{
+        arrayStride: 8,
+        attributes: [
+          { shaderLocation: 0, offset: 0, format: 'float32x2' }
+        ],
+      }],
     },
     fragment: {
       module: device.createShaderModule({
@@ -87,7 +93,7 @@ export default function get_renderer(
       targets: [{ format: presentation_format }]
     },
     primitive: {
-      topology: 'point-list',
+      topology: 'triangle-list',
     },
   });
 
@@ -104,7 +110,23 @@ export default function get_renderer(
       {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
     ],
   });
-  
+
+
+  // WE MAKING THE QUAD SETUP HERE: \(^u^)/
+
+  const quadOffset = new Float32Array([
+    -1,-1,  1,-1,  1, 1,
+    -1,-1,  1, 1, -1, 1,
+  ]);
+
+  const quad_buffer = device.createBuffer({
+    label: 'quad buffer',
+    size: 48,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+
+  device.queue.writeBuffer(quad_buffer, 0, quadOffset);
+
   // ===============================================
   //    TODO: Command Encoder Functions
   // ===============================================
@@ -124,7 +146,10 @@ export default function get_renderer(
     pass.setBindGroup(0, camera_bind_group);
     pass.setBindGroup(1, gaussian_bind_group);
 
-    pass.draw(pc.num_points);
+
+    pass.setVertexBuffer(0, quad_buffer);
+    pass.draw(6, pc.num_points);
+
     pass.end();
   };
 
