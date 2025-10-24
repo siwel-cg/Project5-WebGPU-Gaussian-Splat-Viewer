@@ -39,6 +39,7 @@ export default function get_renderer(
   // ===============================================
   //    Create Compute Pipeline and Bind Groups
   // ===============================================
+
   const preprocess_pipeline = device.createComputePipeline({
     label: 'preprocess',
     layout: 'auto',
@@ -75,8 +76,7 @@ export default function get_renderer(
         label: "gauss vertex shader",
         code: renderWGSL
       }),
-      entryPoint: 'vs_main', 
-      buffers: [ /* YA NEED TO ADD BUFFERS */]
+      entryPoint: 'vs_main'
     },
     fragment: {
       module: device.createShaderModule({
@@ -84,20 +84,49 @@ export default function get_renderer(
         code: renderWGSL
       }),
       entryPoint: 'fs_main', 
-      targets: [{
-        format: presentation_format,
-      }]
+      targets: [{ format: presentation_format }]
     },
-    depthStencil: {
-      format: 'depth24plus',
-      depthWriteEnabled: true
-    }
+    primitive: {
+      topology: 'point-list',
+    },
+  });
+
+  const camera_bind_group = device.createBindGroup({
+    label: 'gauss camera',
+    layout: render_pipeline.getBindGroupLayout(0),
+    entries: [{binding: 0, resource: { buffer: camera_buffer }}],
+  });
+
+  const gaussian_bind_group = device.createBindGroup({
+    label: 'point gaussians',
+    layout: render_pipeline.getBindGroupLayout(1),
+    entries: [
+      {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
+    ],
   });
   
   // ===============================================
   //    TODO: Command Encoder Functions
   // ===============================================
   
+  const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
+    const pass = encoder.beginRenderPass({
+      label: 'gauss render',
+      colorAttachments: [
+        {
+          view: texture_view,
+          loadOp: 'clear',
+          storeOp: 'store',
+        }
+      ],
+    });
+    pass.setPipeline(render_pipeline);
+    pass.setBindGroup(0, camera_bind_group);
+    pass.setBindGroup(1, gaussian_bind_group);
+
+    pass.draw(pc.num_points);
+    pass.end();
+  };
 
   // ===============================================
   //    TODO: Return Render Object
@@ -106,6 +135,7 @@ export default function get_renderer(
   return {
     frame: (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
       sorter.sort(encoder);
+      render(encoder, texture_view);
     },
     camera_buffer,
   };
