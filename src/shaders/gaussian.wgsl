@@ -7,9 +7,10 @@ struct VertexInput {
     @location(0) corner: vec2<f32>
 }
 
-// struct Splat {
-//     //TODO: information defined in preprocess compute shader
-// };
+struct Splat {
+    //TODO: store information for 2D splat rendering
+    NDCpos: vec4<f32>
+};
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -32,6 +33,8 @@ var<uniform> camera: CameraUniforms;
 @group(1) @binding(0)
 var<storage,read> gaussians : array<Gaussian>;
 
+@group(2) @binding(0) // BIND GROUP 2 NOT 3 LIKE IN THE COMPUTE 
+var<storage, read_write> splatList : array<Splat>;
 
 @vertex
 fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
@@ -45,12 +48,11 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 
     let clipPos = camera.proj * camera.view *  pos;
 
-    // convert pixel offsets to ndc offsets
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);
     let offset_ndc = in.corner * 12.0 * px2ndc;
 
-    // apply ndc offset and lift back to clip
+
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;
     let new_xyclip = new_ndc * clipPos.w;

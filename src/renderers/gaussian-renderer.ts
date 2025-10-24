@@ -53,6 +53,20 @@ export default function get_renderer(
     },
   });
 
+  const camera_bind_group_preprocess = device.createBindGroup({
+    label: 'gauss camera',
+    layout: preprocess_pipeline.getBindGroupLayout(0),
+    entries: [{binding: 0, resource: { buffer: camera_buffer }}],
+  });
+
+  const gaussian_bind_group_preprocess = device.createBindGroup({
+    label: 'point gaussians',
+    layout: preprocess_pipeline.getBindGroupLayout(1),
+    entries: [
+      {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
+    ],
+  });
+
   const sort_bind_group = device.createBindGroup({
     label: 'sort',
     layout: preprocess_pipeline.getBindGroupLayout(2),
@@ -112,7 +126,6 @@ export default function get_renderer(
   });
 
   // WE MAKING THE QUAD SETUP HERE: \(^u^)/
-
   const quadOffset = new Float32Array([
     -1,-1,  1,-1,  1, 1,
     -1,-1,  1, 1, -1, 1,
@@ -125,11 +138,37 @@ export default function get_renderer(
   });
 
   device.queue.writeBuffer(quad_buffer, 0, quadOffset);
+  
+  // SPLAT BUFFER FOR PREPROCESSING AND RENDERING
+
+  const splat_buffer = device.createBuffer({
+    label: 'splat buffer',
+    size: pc.num_points * 16, // THIS IS JUST FOR WHEN splat = just a pos: vec4(f32)
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  });
+
+  // BIDN TO BOTH COMPUTE AND GAUSS SO YOU CAN USE IT IN BOTH
+  const prepass_splat_bind_group = device.createBindGroup({
+    label: 'preprocess splat bg',
+    layout: preprocess_pipeline.getBindGroupLayout(3),
+    entries: [
+      {binding: 0, resource: { buffer: splat_buffer}}
+    ]
+  });
+
+  const render_splat_bind_group = device.createBindGroup({
+    label: 'preprocess splat bg',
+    layout: render_pipeline.getBindGroupLayout(2),
+    entries: [
+      {binding: 0, resource: { buffer: splat_buffer}}
+    ]
+  });
 
   // ===============================================
   //    TODO: Command Encoder Functions
   // ===============================================
   
+  // GAUSSIAN RENDERER RENDER PASS
   const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
     const pass = encoder.beginRenderPass({
       label: 'gauss render',
@@ -144,7 +183,7 @@ export default function get_renderer(
     pass.setPipeline(render_pipeline);
     pass.setBindGroup(0, camera_bind_group);
     pass.setBindGroup(1, gaussian_bind_group);
-
+    pass.setBindGroup(2, render_splat_bind_group);
 
     pass.setVertexBuffer(0, quad_buffer);
     pass.draw(6, pc.num_points);
@@ -158,6 +197,19 @@ export default function get_renderer(
 
   return {
     frame: (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
+      const prepass = encoder.beginComputePass({
+        label: 'prepass compute'
+      });
+      prepass.setPipeline(preprocess_pipeline);
+      prepass.setBindGroup(0, camera_bind_group_preprocess);
+      prepass.setBindGroup(1, gaussian_bind_group_preprocess);
+      prepass.setBindGroup(2, sort_bind_group);
+      prepass.setBindGroup(3, prepass_splat_bind_group);
+
+      const numGroups = Math.ceil(pc.num_points / 256);
+      prepass.dispatchWorkgroups(numGroups, 1, 1);
+      prepass.end();
+      
       sorter.sort(encoder);
       render(encoder, texture_view);
     },
