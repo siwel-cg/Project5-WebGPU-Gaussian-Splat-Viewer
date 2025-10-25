@@ -33,8 +33,8 @@ var<uniform> camera: CameraUniforms;
 @group(1) @binding(0)
 var<storage,read> gaussians : array<Gaussian>;
 
-@group(2) @binding(0) // BIND GROUP 2 NOT 3 LIKE IN THE COMPUTE 
-var<storage, read_write> splatList : array<Splat>;
+@group(3) @binding(0)
+var<storage, read> splatList : array<Splat>;
 
 @vertex
 fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
@@ -46,7 +46,7 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
     let b = unpack2x16float(vertex.pos_opacity[1]);
     let pos = vec4<f32>(a.x, a.y, b.x, 1.);
 
-    let clipPos = camera.proj * camera.view *  pos;
+    let clipPos = splatList[instance].NDCpos;// camera.proj * camera.view *  pos;
 
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);

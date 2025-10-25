@@ -152,13 +152,13 @@ export default function get_renderer(
     label: 'preprocess splat bg',
     layout: preprocess_pipeline.getBindGroupLayout(3),
     entries: [
-      {binding: 0, resource: { buffer: splat_buffer}}
+      {binding: 0, resource: { buffer: splat_buffer }}
     ]
   });
 
   const render_splat_bind_group = device.createBindGroup({
-    label: 'preprocess splat bg',
-    layout: render_pipeline.getBindGroupLayout(2),
+    label: 'render splat bg',
+    layout: render_pipeline.getBindGroupLayout(3),
     entries: [
       {binding: 0, resource: { buffer: splat_buffer}}
     ]
@@ -183,7 +183,7 @@ export default function get_renderer(
     pass.setPipeline(render_pipeline);
     pass.setBindGroup(0, camera_bind_group);
     pass.setBindGroup(1, gaussian_bind_group);
-    pass.setBindGroup(2, render_splat_bind_group);
+    pass.setBindGroup(3, render_splat_bind_group);
 
     pass.setVertexBuffer(0, quad_buffer);
     pass.draw(6, pc.num_points);

@@ -61,6 +61,14 @@ struct Splat {
 };
 
 //TODO: bind your data here
+
+// CAMERA AND POINT GUASSIAN DATA:
+@group(0) @binding(0)
+var<uniform> camera: CameraUniforms;
+@group(1) @binding(0)
+var<storage,read> gaussians : array<Gaussian>;
+
+// SORTS
 @group(2) @binding(0)
 var<storage, read_write> sort_infos: SortInfos;
 @group(2) @binding(1)
@@ -70,14 +78,8 @@ var<storage, read_write> sort_indices : array<u32>;
 @group(2) @binding(3)
 var<storage, read_write> sort_dispatch: DispatchIndirect;
 
-// CAMERA AND POINT GUASSIAN DATA:
-@group(0) @binding(0)
-var<uniform> camera: CameraUniforms;
-@group(1) @binding(0)
-var<storage,read> gaussians : array<Gaussian>;
-
 // SPLAT BINGS
-@gropu(3) @binding(0)
+@group(3) @binding(0)
 var<storage, read_write> splatList : array<Splat>;
 
 
@@ -132,6 +134,29 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
     // - Store essential 2D gaussian data for later rasteriation pipeline
     // - Add key_size, indices, and depth to sorter.
 
+    if (idx == 0u) {
+        // --- sort_infos (struct) ---
+        // Read a field and write it back to itself (store = side-effect).
+        let np = sort_infos.passes;     // adjust to a real field name
+        sort_infos.passes = np;
+
+        // --- sort_depths (array<u32>) ---
+        if (arrayLength(&sort_depths) > 0u) {
+            let v = sort_depths[0];
+            sort_depths[0] = v;               // write-back same value
+        }
+
+        // --- sort_indices (array<u32>) ---
+        if (arrayLength(&sort_indices) > 0u) {
+            let i = sort_indices[0];
+            sort_indices[0] = i;              // write-back same value
+        }
+
+        // --- sort_dispatch (struct with e.g. x,y,z) ---
+        let dy = sort_dispatch.dispatch_y;
+        sort_dispatch.dispatch_y = dy;               // write-back same value
+    }
+
     // WE GONNA START BY JUST OUTPUTTING SPLAT DATA
     let vertex = gaussians[idx]; 
     let a = unpack2x16float(vertex.pos_opacity[0]);
@@ -139,8 +164,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
     let pos = vec4<f32>(a.x, a.y, b.x, 1.);
 
     let clipPos = camera.proj * camera.view *  pos;
-    splatList[idx] = clipPos / clipPos.w;
-    
+    splatList[idx].NDCpos = clipPos / clipPos.w;
 
     let keys_per_dispatch = workgroupSize * sortKeyPerThread; 
     // increment DispatchIndirect.dispatchx each time you reach limit for one dispatch of keys
