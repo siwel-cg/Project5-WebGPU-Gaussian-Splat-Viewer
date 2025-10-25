@@ -43,8 +43,11 @@ var<uniform> params: gaussParams;
 @group(3) @binding(0)
 var<storage, read> splatList : array<Splat>;
 
-@group(4) @binding(0)
-var<storage, read_write> splatIndexList : array<u32>;
+@group(3) @binding(1)
+var<storage, read> splatIndexList : array<u32>;
+
+@group(3) @binding(2)
+var<storage, read> indirect_params: array<u32>;
 
 
 @vertex
@@ -52,7 +55,7 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 ) -> VertexOutput {
     //TODO: reconstruct 2D quad based on information from splat, pass 
     var out: VertexOutput;
-    // let vertex = gaussians[instance]; 
+    let vertex = gaussians[instance]; 
     // let a = unpack2x16float(vertex.pos_opacity[0]);
     // let b = unpack2x16float(vertex.pos_opacity[1]);
     // let pos = vec4<f32>(a.x, a.y, b.x, 1.);

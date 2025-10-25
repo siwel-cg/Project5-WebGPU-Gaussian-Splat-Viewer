@@ -145,12 +145,32 @@ export default function get_renderer(
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   });
 
+  // FRUSTRUM INDEX BUFFER
+  const splat_idx_buffer = device.createBuffer({
+    label: 'splat index buffer',
+    size: pc.num_points * 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  });
+
+  // INDIRECT DRAW BUFFER
+  const indirect_buffer = device.createBuffer({
+    label: 'indirect buffer',
+    size: 16,
+    usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+
+  new Uint32Array(indirect_buffer.getMappedRange()).set([6, 0, 0, 0]);
+  indirect_buffer.unmap();
+
   // BIND TO BOTH COMPUTE AND GAUSS SO YOU CAN USE IT IN BOTH
   const prepass_splat_bind_group = device.createBindGroup({
     label: 'preprocess splat bg',
     layout: preprocess_pipeline.getBindGroupLayout(3),
     entries: [
-      {binding: 0, resource: { buffer: splat_buffer }}
+      { binding: 0, resource: { buffer: splat_buffer } },
+      { binding: 1, resource: { buffer: splat_idx_buffer}},
+      { binding: 2, resource: { buffer: indirect_buffer}}
     ]
   });
 
@@ -158,32 +178,28 @@ export default function get_renderer(
     label: 'render splat bg',
     layout: render_pipeline.getBindGroupLayout(3),
     entries: [
-      {binding: 0, resource: { buffer: splat_buffer}}
+      { binding: 0, resource: { buffer: splat_buffer } },
+      { binding: 1, resource: { buffer: splat_idx_buffer}}
     ]
   });
 
+  
   // FRUSTRUM INDICES BUFFERS
-  const splat_idx_buffer = device.createBuffer({
-    label: 'splat index buffer',
-    size: pc.num_points * 4,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
-  });
+  // const prepass_splat_idx_bind_group = device.createBindGroup({
+  //   label: 'prepass splat idx bg',
+  //   layout: preprocess_pipeline.getBindGroupLayout(4),
+  //   entries: [
+  //     {binding: 0, resource: { buffer: splat_idx_buffer }}
+  //   ]
+  // });
 
-  const prepass_splat_idx_bind_group = device.createBindGroup({
-    label: 'prepass splat idx bg',
-    layout: preprocess_pipeline.getBindGroupLayout(4),
-    entries: [
-      {binding: 0, resource: { buffer: splat_idx_buffer }}
-    ]
-  });
-
-  const render_splat_idx_bind_group = device.createBindGroup({
-    label: 'render splat idx bg',
-    layout: render_pipeline.getBindGroupLayout(4),
-    entries: [
-      {binding: 0, resource: { buffer: splat_idx_buffer }}
-    ]
-  });
+  // const render_splat_idx_bind_group = device.createBindGroup({
+  //   label: 'render splat idx bg',
+  //   layout: render_pipeline.getBindGroupLayout(4),
+  //   entries: [
+  //     {binding: 0, resource: { buffer: splat_idx_buffer }}
+  //   ]
+  // });
 
   // GAUSSIAN MULT BUFFER + UPDATE
   const paramsBuffer = device.createBuffer({
@@ -206,21 +222,14 @@ export default function get_renderer(
   //    TODO: Command Encoder Functions
   // ===============================================
 
-  // INDIRECT DRAW BUFFER / BG
-  
-  const indirectBuff = device.createBuffer({
-    size: 16,
-    usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE,
-    mappedAtCreation: true
-  });
 
-  const indirect_bind_group = device.createBindGroup({
-    label: 'inirect bind group',
-    layout: preprocess_pipeline.getBindGroupLayout(5),
-    entries: [
-      { binding: 0, resource: { buffer: indirectBuff}}
-    ]
-  });
+  // const indirect_bind_group = device.createBindGroup({
+  //   label: 'inirect bind group',
+  //   layout: preprocess_pipeline.getBindGroupLayout(5),
+  //   entries: [
+  //     { binding: 0, resource: { buffer: indirect_buffer}}
+  //   ]
+  // });
 
 
   const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
@@ -239,13 +248,13 @@ export default function get_renderer(
     pass.setBindGroup(1, gaussian_bind_group);
     pass.setBindGroup(2, paramsBindGroup);   
     pass.setBindGroup(3, render_splat_bind_group);
-    pass.setBindGroup(4, render_splat_idx_bind_group);
+    // pass.setBindGroup(4, render_splat_idx_bind_group);
 
     pass.setVertexBuffer(0, quad_buffer);
 
 
     // INDIRECT DRAW
-    pass.drawIndirect(indirectBuff, 0);
+    pass.drawIndirect(indirect_buffer, 0);
 
     // HARD CODED DRAW 
     //pass.draw(6, pc.num_points);
@@ -259,6 +268,8 @@ export default function get_renderer(
 
   return {
     frame: (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
+      encoder.clearBuffer(sorter.sort_info_buffer, 0, 4);
+
       const prepass = encoder.beginComputePass({
         label: 'prepass compute'
       });
@@ -267,10 +278,8 @@ export default function get_renderer(
       prepass.setBindGroup(1, gaussian_bind_group_preprocess);
       prepass.setBindGroup(2, sort_bind_group);
       prepass.setBindGroup(3, prepass_splat_bind_group);
-      prepass.setBindGroup(4, prepass_splat_idx_bind_group);
-      prepass.setBindGroup(5, indirect_bind_group);
-
-      encoder.clearBuffer(sorter.sort_info_buffer, 0, 4);
+      // prepass.setBindGroup(4, prepass_splat_idx_bind_group);
+      // prepass.setBindGroup(5, indirect_bind_group);
 
       const numGroups = Math.ceil(pc.num_points / 256);
       prepass.dispatchWorkgroups(numGroups, 1, 1);

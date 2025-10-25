@@ -82,10 +82,10 @@ var<storage, read_write> sort_dispatch: DispatchIndirect;
 @group(3) @binding(0)
 var<storage, read_write> splatList : array<Splat>;
 
-@group(4) @binding(0)
+@group(3) @binding(1)
 var<storage, read_write> splatIndexList : array<u32>;
 
-@group(5) @binding(0)
+@group(3) @binding(2)
 var<storage, read_write> indirect_params: array<u32>;
 
 
@@ -167,7 +167,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
 
     let clipPos = camera.proj * camera.view *  pos;
 
-    // DO CULLING HERE
+    // DO CULLING HERE (THIS IS WRONG I THINK)
     let xBound = (camera.viewport.x - (camera.viewport.x * 0.5)) * 1.2;
     let yBound = (camera.viewport.y - (camera.viewport.y * 0.5)) * 1.2;
 
