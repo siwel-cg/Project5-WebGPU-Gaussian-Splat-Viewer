@@ -52,11 +52,9 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
                            2.0 / camera.viewport.y);
     let offset_ndc = in.corner * 12.0 * px2ndc;
 
-
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;
     let new_xyclip = new_ndc * clipPos.w;
-
 
     out.position = vec4<f32>(new_xyclip, clipPos.z, clipPos.w);
 

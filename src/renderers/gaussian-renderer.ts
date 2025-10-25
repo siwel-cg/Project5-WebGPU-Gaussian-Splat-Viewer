@@ -170,25 +170,7 @@ export default function get_renderer(
   
   // GAUSSIAN RENDERER RENDER PASS
   const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
-    const pass = encoder.beginRenderPass({
-      label: 'gauss render',
-      colorAttachments: [
-        {
-          view: texture_view,
-          loadOp: 'clear',
-          storeOp: 'store',
-        }
-      ],
-    });
-    pass.setPipeline(render_pipeline);
-    pass.setBindGroup(0, camera_bind_group);
-    pass.setBindGroup(1, gaussian_bind_group);
-    pass.setBindGroup(3, render_splat_bind_group);
-
-    pass.setVertexBuffer(0, quad_buffer);
-    pass.draw(6, pc.num_points);
-
-    pass.end();
+    
   };
 
   // ===============================================
@@ -211,7 +193,28 @@ export default function get_renderer(
       prepass.end();
       
       sorter.sort(encoder);
-      render(encoder, texture_view);
+
+      const pass = encoder.beginRenderPass({
+        label: 'gauss render',
+        colorAttachments: [
+          {
+            view: texture_view,
+            loadOp: 'clear',
+            storeOp: 'store',
+          }
+        ],
+      });
+      pass.setPipeline(render_pipeline);
+      pass.setBindGroup(0, camera_bind_group);
+      pass.setBindGroup(1, gaussian_bind_group);
+      pass.setBindGroup(3, render_splat_bind_group);
+
+      pass.setVertexBuffer(0, quad_buffer);
+      pass.draw(6, pc.num_points);
+
+      pass.end();
+
+      //render(encoder, texture_view);
     },
     camera_buffer,
   };
