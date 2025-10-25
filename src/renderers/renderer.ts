@@ -42,7 +42,6 @@ export default async function init(
     format: presentation_format,
     alphaMode: 'opaque',
   });
-  
 
   // Tweakpane: easily adding tweak control for parameters.
   const params = {
@@ -86,6 +85,7 @@ export default async function init(
         const pc = await load(uploadedFile, device);
         pointcloud_renderer = get_renderer_pointcloud(pc, device, presentation_format, camera.uniform_buffer);
         gaussian_renderer = get_renderer_gaussian(pc, device, presentation_format, camera.uniform_buffer);
+        gaussian_renderer.setGaussianMultiplier(params.gaussian_multiplier);
         renderers = {
           pointcloud: pointcloud_renderer,
           gaussian: gaussian_renderer,
@@ -116,13 +116,16 @@ export default async function init(
     });
   }
   {
+
     pane.addInput(
       params,
       'gaussian_multiplier',
       {min: 0, max: 1.5}
     ).on('change', (e) => {
       //TODO: Bind constants to the gaussian renderer.
+      gaussian_renderer.setGaussianMultiplier(e.value);
     });
+
   }
 
   document.addEventListener('keydown', (event) => {

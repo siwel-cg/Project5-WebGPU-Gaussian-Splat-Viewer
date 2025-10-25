@@ -27,11 +27,18 @@ struct Gaussian {
     scale: array<u32,2>
 }
 
+struct gaussParams{
+    gaussian_mult: f32
+}
+
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
 
 @group(1) @binding(0)
 var<storage,read> gaussians : array<Gaussian>;
+
+@group(2) @binding(0)
+var<uniform> params: gaussParams;
 
 @group(3) @binding(0)
 var<storage, read> splatList : array<Splat>;
@@ -50,7 +57,7 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);
-    let offset_ndc = in.corner * 12.0 * px2ndc;
+    let offset_ndc = in.corner * params.gaussian_mult * 10.0 * px2ndc;
 
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;

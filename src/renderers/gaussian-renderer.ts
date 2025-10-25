@@ -5,7 +5,7 @@ import { get_sorter,c_histogram_block_rows,C } from '../sort/sort';
 import { Renderer } from './renderer';
 
 export interface GaussianRenderer extends Renderer {
-
+  setGaussianMultiplier: (v: number) => void;
 }
 
 // Utility to create GPU buffers
@@ -21,15 +21,15 @@ const createBuffer = (
   return buffer;
 };
 
+
 export default function get_renderer(
   pc: PointCloud,
   device: GPUDevice,
   presentation_format: GPUTextureFormat,
-  camera_buffer: GPUBuffer,
+  camera_buffer: GPUBuffer
 ): GaussianRenderer {
 
   const sorter = get_sorter(pc.num_points, device);
-  
   // ===============================================
   //            Initialize GPU Buffers
   // ===============================================
@@ -164,13 +164,49 @@ export default function get_renderer(
     ]
   });
 
+  // GAUSSIAN MULT BUFFER + UPDATE
+  const paramsBuffer = device.createBuffer({
+    label: 'params buffer',
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+
+  const paramsBindGroup = device.createBindGroup({
+    label: 'gauss mult bind group',
+    layout: render_pipeline.getBindGroupLayout(2),
+    entries: [{ binding: 0, resource: { buffer: paramsBuffer } }]
+  });
+
+
+  function setGaussianMultiplier(gmult: number) {
+    device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([gmult]));
+  }
+
   // ===============================================
   //    TODO: Command Encoder Functions
   // ===============================================
-  
-  // GAUSSIAN RENDERER RENDER PASS
+
   const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
-    
+    const pass = encoder.beginRenderPass({
+      label: 'gauss render',
+      colorAttachments: [
+        {
+          view: texture_view,
+          loadOp: 'clear',
+          storeOp: 'store',
+        }
+      ],
+    });
+    pass.setPipeline(render_pipeline);
+    pass.setBindGroup(0, camera_bind_group);
+    pass.setBindGroup(1, gaussian_bind_group);
+    pass.setBindGroup(2, paramsBindGroup);   
+    pass.setBindGroup(3, render_splat_bind_group);
+
+    pass.setVertexBuffer(0, quad_buffer);
+    pass.draw(6, pc.num_points);
+
+    pass.end();
   };
 
   // ===============================================
@@ -194,28 +230,11 @@ export default function get_renderer(
       
       sorter.sort(encoder);
 
-      const pass = encoder.beginRenderPass({
-        label: 'gauss render',
-        colorAttachments: [
-          {
-            view: texture_view,
-            loadOp: 'clear',
-            storeOp: 'store',
-          }
-        ],
-      });
-      pass.setPipeline(render_pipeline);
-      pass.setBindGroup(0, camera_bind_group);
-      pass.setBindGroup(1, gaussian_bind_group);
-      pass.setBindGroup(3, render_splat_bind_group);
-
-      pass.setVertexBuffer(0, quad_buffer);
-      pass.draw(6, pc.num_points);
-
-      pass.end();
-
-      //render(encoder, texture_view);
+      render(encoder, texture_view);
     },
     camera_buffer,
+    setGaussianMultiplier 
   };
 }
+
+
