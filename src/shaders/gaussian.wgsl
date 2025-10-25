@@ -43,17 +43,23 @@ var<uniform> params: gaussParams;
 @group(3) @binding(0)
 var<storage, read> splatList : array<Splat>;
 
+@group(4) @binding(0)
+var<storage, read_write> splatIndexList : array<u32>;
+
+
 @vertex
 fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 ) -> VertexOutput {
     //TODO: reconstruct 2D quad based on information from splat, pass 
     var out: VertexOutput;
-    let vertex = gaussians[instance]; 
-    let a = unpack2x16float(vertex.pos_opacity[0]);
-    let b = unpack2x16float(vertex.pos_opacity[1]);
-    let pos = vec4<f32>(a.x, a.y, b.x, 1.);
+    // let vertex = gaussians[instance]; 
+    // let a = unpack2x16float(vertex.pos_opacity[0]);
+    // let b = unpack2x16float(vertex.pos_opacity[1]);
+    // let pos = vec4<f32>(a.x, a.y, b.x, 1.);
 
-    let clipPos = splatList[instance].NDCpos;// camera.proj * camera.view *  pos;
+    let culledIndex = splatIndexList[instance];
+
+    let clipPos = splatList[culledIndex].NDCpos;// camera.proj * camera.view *  pos;
 
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);
@@ -62,6 +68,8 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;
     let new_xyclip = new_ndc * clipPos.w;
+
+    
 
     out.position = vec4<f32>(new_xyclip, clipPos.z, clipPos.w);
 
