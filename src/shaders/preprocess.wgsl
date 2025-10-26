@@ -168,23 +168,37 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
     let clipPos = camera.proj * camera.view *  pos;
 
     // DO CULLING HERE (THIS IS WRONG I THINK)
-    let xBound = (camera.viewport.x - (camera.viewport.x * 0.5)) * 1.2;
-    let yBound = (camera.viewport.y - (camera.viewport.y * 0.5)) * 1.2;
+    // let xBound = (camera.viewport.x - (camera.viewport.x * 0.5)) * 1.2;
+    // let yBound = (camera.viewport.y - (camera.viewport.y * 0.5)) * 1.2;
 
-    if (clipPos.x >= -xBound && clipPos.x <= xBound) {
-        if (clipPos.y >= -yBound && clipPos.y <= yBound) {
-            let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
-            splatIndexList[culledIdx] = idx;
-            splatList[idx].NDCpos = clipPos / clipPos.w;
-        }
+    // if (clipPos.x >= -xBound && clipPos.x <= xBound) {
+    //     if (clipPos.y >= -yBound && clipPos.y <= yBound) {
+    //         let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
+    //         splatIndexList[culledIdx] = idx;
+    //         splatList[idx].NDCpos = clipPos / clipPos.w;
+    //     }
+    // }
+
+    let w = clipPos.w;
+    let margin = 1.2;
+
+    if (w > 0.0 &&  
+        clipPos.x >= -w * margin && clipPos.x <= w * margin &&
+        clipPos.y >= -w * margin && clipPos.y <= w * margin && 
+        clipPos.z >= 0.0 && clipPos.z <= w) {
+        
+        let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
+        splatIndexList[culledIdx] = idx;
+        splatList[idx].NDCpos = clipPos / clipPos.w;
     }
 
     if (idx == 0u) {
         indirect_params[0] = 6u;
-        indirect_params[1] = atomicLoad(&sort_infos.keys_size);  
         indirect_params[2] = 0u;
         indirect_params[3] = 0u;
     }
+    // THIS SHOULD BE RUNNING JUST ON THE LAST THREAD OR AFTER ALL THREADS HAVE FINISHED
+    indirect_params[1] = atomicLoad(&sort_infos.keys_size);  
 
     let keys_per_dispatch = workgroupSize * sortKeyPerThread; 
     // increment DispatchIndirect.dispatchx each time you reach limit for one dispatch of keys

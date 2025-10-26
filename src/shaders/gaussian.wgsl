@@ -46,9 +46,6 @@ var<storage, read> splatList : array<Splat>;
 @group(3) @binding(1)
 var<storage, read> splatIndexList : array<u32>;
 
-@group(3) @binding(2)
-var<storage, read> indirect_params: array<u32>;
-
 
 @vertex
 fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
@@ -66,7 +63,12 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);
-    let offset_ndc = in.corner * params.gaussian_mult * 10.0 * px2ndc;
+    var offset_ndc = in.corner * params.gaussian_mult * px2ndc;
+    // let a = unpack2x16float(vertex.scale[0]);
+    // offset_ndc.x *= a.x;
+    // offset_ndc.y *= a.y;
+
+    offset_ndc *= 10.0; // IF SCENE HAS NO SCALE ATTRIBUTE
 
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;
