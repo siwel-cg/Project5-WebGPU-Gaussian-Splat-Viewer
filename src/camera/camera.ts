@@ -95,7 +95,7 @@ export async function load_camera_presets(file: string): Promise<CameraPreset[]>
 
 const c_size_vec2 = 4 * 2;
 const c_size_mat4 = 4 * 16; // byte size of mat4 (i.e. Float32Array(16))
-const c_size_camera_uniform = 4 * c_size_mat4 + 2 * c_size_vec2;
+const c_size_camera_uniform = 4 * c_size_mat4 + 4 * c_size_vec2;
 interface CameraUniform {
   view_matrix: Mat4,
   view_inv_matrix: Mat4,
@@ -126,10 +126,12 @@ export class Camera {
   }
 
   on_update_canvas(): void {
-    const focal = 0.5 * this.canvas.height / Math.tan(this.fovY * 0.5);
-    this.focal[0] = focal;
-    this.focal[1] = focal;
-    this.fovX = focal2fov(focal, this.canvas.width);
+    //const focal = 0.5 * this.canvas.height / Math.tan(this.fovY * 0.5);
+    const focal_y = this.canvas.height / (2 * Math.tan(this.fovY * 0.5));
+    const focal_x = this.canvas.width / (2 * Math.tan(this.fovX * 0.5));
+    this.focal[0] = focal_y;
+    this.focal[1] = focal_x;
+    this.fovX = focal2fov(focal_y, this.canvas.width);
     this.viewport[0] = this.canvas.width;
     this.viewport[1] = this.canvas.height;
     // const viewport_ratio = this.canvas.width / this.canvas.height;
@@ -175,9 +177,9 @@ export class Camera {
     intermediate_float_32_array.set(mat4.inverse(this.proj_matrix), offset);
     offset += 16;
     intermediate_float_32_array.set(this.viewport, offset);
-    offset += 2;
+    offset += 4;
     intermediate_float_32_array.set(this.focal, offset);
-    offset += 2;
+    offset += 4;
 
     this.device.queue.writeBuffer(this.uniform_buffer, 0, intermediate_float_32_array);
   }

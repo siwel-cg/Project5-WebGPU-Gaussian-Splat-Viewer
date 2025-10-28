@@ -41,7 +41,9 @@ struct CameraUniforms {
     proj: mat4x4<f32>,
     proj_inv: mat4x4<f32>,
     viewport: vec2<f32>,
-    focal: vec2<f32>
+    _pad1: vec2<f32>,
+    focal: vec2<f32>,
+    _pad2: vec2<f32>
 };
 
 struct RenderSettings {
@@ -184,9 +186,6 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         clipPos.y >= -w * margin && clipPos.y <= w * margin && 
         clipPos.z >= 0.0 && clipPos.z <= w) {
         
-        let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
-        splatIndexList[culledIdx] = idx;
-        
         // CALCULATE COV
         let normRot = normalize(rot);
         let r = normRot.x;
@@ -201,10 +200,11 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         );
 
         let gaussian_mult = 1.0; // CHANGE TO GAUSSIAN_MULTIPLIER LATER
-        var S = mat3x3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-        S[0][0] = gaussian_mult * scale.x;
-        S[1][1] = gaussian_mult * scale.y;
-        S[2][2] = gaussian_mult * scale.z;
+        let S = mat3x3f(
+            gaussian_mult * scale.x, 0.0, 0.0,
+            0.0, gaussian_mult * scale.y, 0.0,
+            0.0, 0.0, gaussian_mult * scale.z
+        );
 
         let M = S * R;
 
@@ -216,10 +216,9 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
             camera.view[2][0], camera.view[2][1], camera.view[2][2]
         );
 
-        // let fovY = 45.0 / 180.0 * 3.141592;
-        // let focal = 0.5 * camera.viewport.y / tan(fovY * 0.5);
+        let fx = camera.proj[0][0];
+        let fy = abs(camera.proj[1][1]);
 
-        /*
         let J = mat3x3f(
             fx / viewPos.z, 0.0f, -(fx * viewPos.x) / (viewPos.z * viewPos.z),
             0.0f, fy / viewPos.z, -(fy * viewPos.y) / (viewPos.z * viewPos.z),
@@ -240,6 +239,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let cov = vec3f(Sigma2D[0][0], Sigma2D[0][1], Sigma2D[1][1]);
         let det = (cov.x * cov.z - cov.y * cov.y);
         if (det == 0.0f) { return; }
+
         let det_inv = 1.f / det;
         let conic = vec3f(cov.z * det_inv, -cov.y * det_inv, cov.x * det_inv);
 
@@ -247,11 +247,20 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let lambda1 = mid + sqrt(max(0.1f, mid * mid - det));
         let lambda2 = mid - sqrt(max(0.1f, mid * mid - det));
         let my_radius = ceil(3.f * sqrt(max(lambda1, lambda2)));
-        */
-        let fovY = 45.0 / 180.0 * 3.141592;
-        let focal = 0.5 * camera.viewport.y / tan(fovY * 0.5);
+
+        if (det <= 0.0001f) { 
+            return;  // Exit before writing anything
+        }
+
+        let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
+        if (culledIdx >= arrayLength(&splatIndexList)) {
+            return;
+        }
+
+        splatIndexList[culledIdx] = idx;
         splatList[idx].NDCpos = clipPos / clipPos.w;
-        splatList[idx].radius = focal;// my_radius;
+        splatList[idx].conic = conic;
+        splatList[idx].radius = my_radius;// my_radius;
     }
 
     if (idx == 0u) {
