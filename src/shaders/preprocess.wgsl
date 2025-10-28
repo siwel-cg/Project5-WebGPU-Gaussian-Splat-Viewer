@@ -56,8 +56,9 @@ struct Gaussian {
 };
 
 struct Splat {
-    //TODO: store information for 2D splat rendering
-    NDCpos: vec4<f32>
+    NDCpos: vec4<f32>,
+    conic: vec3<f32>,
+    radius: f32
 };
 
 //TODO: bind your data here
@@ -65,6 +66,7 @@ struct Splat {
 // CAMERA AND POINT GUASSIAN DATA:
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
+
 @group(1) @binding(0)
 var<storage,read> gaussians : array<Gaussian>;
 
@@ -132,13 +134,6 @@ fn computeColorFromSH(dir: vec3<f32>, v_idx: u32, sh_deg: u32) -> vec3<f32> {
 fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) wgs: vec3<u32>) {
     let idx = gid.x;
     //TODO: set up pipeline as described in instruction
-    
-    // - Implement view frustum culling to remove non-visible Gaussians (make bounding box to be slightly larger to keep the edge gaussians)
-    // - Compute 3D covariance based on rotation and scale, also user inputted gaussian multipler. (see post on 1.1 section)
-    // - Compute 2D conic, maximum radius, and maximum quad size in NDC (see post on 1.1 section)
-    // - Using spherical harmonics coeffiecients to evaluate the color of the gaussian from particular view direction (evaluation function is provided, see post ).
-    // - Store essential 2D gaussian data for later rasteriation pipeline
-    // - Add key_size, indices, and depth to sorter.
 
     // IDENTITY OPS ON SORT BUFFERS SO THEY DON"T GET CUT
     if (idx == 0u) {
@@ -159,26 +154,28 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         sort_dispatch.dispatch_y = dy;
     }
 
+    if (idx >= arrayLength(&gaussians)) {
+        return;
+    }
+
     // WE GONNA START BY JUST OUTPUTTING SPLAT DATA
     let vertex = gaussians[idx]; 
     let a = unpack2x16float(vertex.pos_opacity[0]);
     let b = unpack2x16float(vertex.pos_opacity[1]);
     let pos = vec4<f32>(a.x, a.y, b.x, 1.);
 
-    let clipPos = camera.proj * camera.view *  pos;
+    let s1 = unpack2x16float(vertex.scale[0]);
+    let s2 = unpack2x16float(vertex.scale[1]);
+    let scale = vec4<f32>(s1.x, s1.y, s2.x, 1.0);
 
-    // DO CULLING HERE (THIS IS WRONG I THINK)
-    // let xBound = (camera.viewport.x - (camera.viewport.x * 0.5)) * 1.2;
-    // let yBound = (camera.viewport.y - (camera.viewport.y * 0.5)) * 1.2;
+    let r1 = unpack2x16float(vertex.rot[0]);
+    let r2 = unpack2x16float(vertex.rot[1]);
+    let rot = vec4<f32>(r1.x, r1.y, r2.x, r2.y);
 
-    // if (clipPos.x >= -xBound && clipPos.x <= xBound) {
-    //     if (clipPos.y >= -yBound && clipPos.y <= yBound) {
-    //         let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
-    //         splatIndexList[culledIdx] = idx;
-    //         splatList[idx].NDCpos = clipPos / clipPos.w;
-    //     }
-    // }
+    let viewPos = camera.view *  pos;
+    let clipPos = camera.proj * viewPos;
 
+    // CULLING
     let w = clipPos.w;
     let margin = 1.2;
 
@@ -189,16 +186,80 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         
         let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
         splatIndexList[culledIdx] = idx;
+        
+        // CALCULATE COV
+        let normRot = normalize(rot);
+        let r = normRot.x;
+        let x = normRot.y;
+        let y = normRot.z;
+        let z = normRot.w;
+
+        let R = mat3x3f(
+            1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
+            2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
+            2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
+        );
+
+        let gaussian_mult = 1.0; // CHANGE TO GAUSSIAN_MULTIPLIER LATER
+        var S = mat3x3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        S[0][0] = gaussian_mult * scale.x;
+        S[1][1] = gaussian_mult * scale.y;
+        S[2][2] = gaussian_mult * scale.z;
+
+        let M = S * R;
+
+        let Sigma3D = transpose(M) * M;
+
+        let W = mat3x3f(
+            camera.view[0][0], camera.view[0][1], camera.view[0][2],
+            camera.view[1][0], camera.view[1][1], camera.view[1][2],
+            camera.view[2][0], camera.view[2][1], camera.view[2][2]
+        );
+
+        // let fovY = 45.0 / 180.0 * 3.141592;
+        // let focal = 0.5 * camera.viewport.y / tan(fovY * 0.5);
+
+        /*
+        let J = mat3x3f(
+            fx / viewPos.z, 0.0f, -(fx * viewPos.x) / (viewPos.z * viewPos.z),
+            0.0f, fy / viewPos.z, -(fy * viewPos.y) / (viewPos.z * viewPos.z),
+            0, 0, 0
+        );
+
+        let T = W * J;
+        let cov3D = mat3x3f(
+            Sigma3D[0][0], Sigma3D[0][1], Sigma3D[0][2],
+            Sigma3D[1][0], Sigma3D[1][1], Sigma3D[1][2],
+            Sigma3D[2][0], Sigma3D[2][1], Sigma3D[2][2]
+        );
+
+        var Sigma2D = transpose(T) * transpose(cov3D) * T;
+        Sigma2D[0][0] += 0.3f;
+        Sigma2D[1][1] += 0.3f;
+
+        let cov = vec3f(Sigma2D[0][0], Sigma2D[0][1], Sigma2D[1][1]);
+        let det = (cov.x * cov.z - cov.y * cov.y);
+        if (det == 0.0f) { return; }
+        let det_inv = 1.f / det;
+        let conic = vec3f(cov.z * det_inv, -cov.y * det_inv, cov.x * det_inv);
+
+        let mid = 0.5f * (cov.x + cov.z);
+        let lambda1 = mid + sqrt(max(0.1f, mid * mid - det));
+        let lambda2 = mid - sqrt(max(0.1f, mid * mid - det));
+        let my_radius = ceil(3.f * sqrt(max(lambda1, lambda2)));
+        */
+        let fovY = 45.0 / 180.0 * 3.141592;
+        let focal = 0.5 * camera.viewport.y / tan(fovY * 0.5);
         splatList[idx].NDCpos = clipPos / clipPos.w;
+        splatList[idx].radius = focal;// my_radius;
     }
 
     if (idx == 0u) {
         indirect_params[0] = 6u;
+        indirect_params[1] = atomicLoad(&sort_infos.keys_size);  
         indirect_params[2] = 0u;
         indirect_params[3] = 0u;
     }
-    // THIS SHOULD BE RUNNING JUST ON THE LAST THREAD OR AFTER ALL THREADS HAVE FINISHED
-    indirect_params[1] = atomicLoad(&sort_infos.keys_size);  
 
     let keys_per_dispatch = workgroupSize * sortKeyPerThread; 
     // increment DispatchIndirect.dispatchx each time you reach limit for one dispatch of keys

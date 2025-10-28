@@ -8,8 +8,9 @@ struct VertexInput {
 }
 
 struct Splat {
-    //TODO: store information for 2D splat rendering
-    NDCpos: vec4<f32>
+    NDCpos: vec4<f32>,
+    conic: vec3<f32>,
+    radius: f32
 };
 
 struct CameraUniforms {
@@ -53,28 +54,30 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
     //TODO: reconstruct 2D quad based on information from splat, pass 
     var out: VertexOutput;
     let vertex = gaussians[instance]; 
-    // let a = unpack2x16float(vertex.pos_opacity[0]);
-    // let b = unpack2x16float(vertex.pos_opacity[1]);
-    // let pos = vec4<f32>(a.x, a.y, b.x, 1.);
+    let a = unpack2x16float(vertex.pos_opacity[0]);
+    let b = unpack2x16float(vertex.pos_opacity[1]);
+    let pos = vec4<f32>(a.x, a.y, b.x, 1.);
 
     let culledIndex = splatIndexList[instance];
-
-    let clipPos = splatList[culledIndex].NDCpos;// camera.proj * camera.view *  pos;
+    let rad = splatList[culledIndex].radius;
+    let clipPos = splatList[culledIndex].NDCpos;// camera.proj * camera.view *  pos; //
 
     let px2ndc = vec2<f32>(2.0 / camera.viewport.x,
                            2.0 / camera.viewport.y);
-    var offset_ndc = in.corner * params.gaussian_mult * px2ndc;
+
+    var offset_ndc = rad * in.corner * px2ndc;
+
+    let magic = params.gaussian_mult;
+
     // let a = unpack2x16float(vertex.scale[0]);
     // offset_ndc.x *= a.x;
     // offset_ndc.y *= a.y;
 
-    offset_ndc *= 10.0; // IF SCENE HAS NO SCALE ATTRIBUTE
+    //offset_ndc *= 10.0; // IF SCENE HAS NO SCALE ATTRIBUTE
 
     let ndc_center = clipPos.xy / clipPos.w;
     let new_ndc = ndc_center + offset_ndc;
-    let new_xyclip = new_ndc * clipPos.w;
-
-    
+    let new_xyclip = new_ndc * clipPos.w;    
 
     out.position = vec4<f32>(new_xyclip, clipPos.z, clipPos.w);
 

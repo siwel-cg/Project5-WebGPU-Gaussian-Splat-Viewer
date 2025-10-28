@@ -141,7 +141,7 @@ export default function get_renderer(
   // SPLAT BUFFER FOR PREPROCESSING AND RENDERING
   const splat_buffer = device.createBuffer({
     label: 'splat buffer',
-    size: pc.num_points * 16, // THIS IS JUST FOR WHEN splat = just a pos: vec4(f32)
+    size: pc.num_points * 48,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   });
 
