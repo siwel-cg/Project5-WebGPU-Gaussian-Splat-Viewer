@@ -61,7 +61,8 @@ struct Splat {
     NDCpos: vec4<f32>,
     conic: vec3<f32>,
     radius: f32,
-    color: vec3<f32>
+    color: vec3<f32>,
+    opacity: f32
 };
 
 //TODO: bind your data here
@@ -99,13 +100,8 @@ var<storage, read_write> indirect_params: array<u32>;
 /// reads the ith sh coef from the storage buffer 
 fn sh_coef(splat_idx: u32, c_idx: u32) -> vec3<f32> {
     //TODO: access your binded sh_coeff, see load.ts for how it is stored
-    let base_u32_idx = splat_idx * 24u;  // 24 u32s per gaussian
-    let coef_offset = c_idx * 3u;  // RGB for this coefficient
-    
-    // RGB are stored consecutively, so:
-    // coef 0: [R0, G0] in u32[0], [B0, R1] in u32[1]
-    // coef 1: [G1, B1] in u32[1], [R2, G2] in u32[2]
-    // etc.
+    let base_u32_idx = splat_idx * 24u;
+    let coef_offset = c_idx * 3u;
     
     let u32_offset = coef_offset / 2u;
     let is_even = (coef_offset % 2u) == 0u;
@@ -114,12 +110,10 @@ fn sh_coef(splat_idx: u32, c_idx: u32) -> vec3<f32> {
     let packed1 = sh_coeffs[base_u32_idx + u32_offset + 1u];
     
     if (is_even) {
-        // [R, G] in packed0, [B, ?] in packed1
         let rg = unpack2x16float(packed0);
         let bx = unpack2x16float(packed1);
         return vec3<f32>(rg.x, rg.y, bx.x);
     } else {
-        // [?, R] in packed0, [G, B] in packed1
         let xr = unpack2x16float(packed0);
         let gb = unpack2x16float(packed1);
         return vec3<f32>(xr.y, gb.x, gb.y);
@@ -166,18 +160,18 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
 
     // IDENTITY OPS ON SORT BUFFERS SO THEY DON"T GET CUT
     if (idx == 0u) {
-        let np = sort_infos.passes;
-        sort_infos.passes = np;
+    //     let np = sort_infos.passes;
+    //     sort_infos.passes = np;
 
-        if (arrayLength(&sort_depths) > 0u) {
-            let v = sort_depths[0];
-            sort_depths[0] = v;
-        }
+    //     if (arrayLength(&sort_depths) > 0u) {
+    //         let v = sort_depths[0];
+    //         sort_depths[0] = v;
+    //     }
 
-        if (arrayLength(&sort_indices) > 0u) {
-            let i = sort_indices[0];
-            sort_indices[0] = i;
-        }
+    //     if (arrayLength(&sort_indices) > 0u) {
+    //         let i = sort_indices[0];
+    //         sort_indices[0] = i;
+    //     }
 
         let dy = sort_dispatch.dispatch_y;
         sort_dispatch.dispatch_y = dy;
@@ -298,6 +292,15 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         splatList[idx].conic = conic;
         splatList[idx].radius = radius;
         splatList[idx].color = color;
+        splatList[idx].opacity = b.y;
+
+        // STORE DEPTH AND INDICES FOR 
+
+        let u = bitcast<u32>(-viewPos.z);
+        let mask = select(0xFFFFFFFFu, 0x80000000u, (u & 0x80000000u) == 0u);
+        let depth_uint = u ^ mask;
+        sort_depths[culledIdx] = depth_uint;
+        sort_indices[culledIdx] = culledIdx;
     }
 
     if (idx == 0u) {

@@ -78,6 +78,7 @@ export default function get_renderer(
     ],
   });
 
+
   // ===============================================
   //    TODO: Create Render Pipeline and Bind Groups
   // =============================================== 
@@ -104,7 +105,21 @@ export default function get_renderer(
         code: renderWGSL
       }),
       entryPoint: 'fs_main', 
-      targets: [{ format: presentation_format }]
+      targets: [{ 
+        format: presentation_format,
+        blend: {
+          color: {
+            srcFactor: 'one',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'one',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
+        },
+      }]
     },
     primitive: {
       topology: 'triangle-list',
@@ -209,15 +224,29 @@ export default function get_renderer(
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
 
-  const paramsBindGroup = device.createBindGroup({
-    label: 'gauss mult bind group',
-    layout: render_pipeline.getBindGroupLayout(2),
-    entries: [{ binding: 0, resource: { buffer: paramsBuffer } }]
-  });
+
+  // I DON"T NEED TO BIND IT TO THE RENDERER, ONLY TO THE PREPASS
+  // const paramsBindGroup = device.createBindGroup({
+  //   label: 'gauss mult bind group',
+  //   layout: render_pipeline.getBindGroupLayout(2),
+  //   entries: [{ binding: 0, resource: { buffer: paramsBuffer } }]
+  // });
 
   function setGaussianMultiplier(gmult: number) {
     device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([gmult]));
   }
+
+  // BIND SORT BUFFERS TO RENDERER:
+  const sort_bind_group_renderer = device.createBindGroup({
+    label: 'renderer sort',
+    layout: render_pipeline.getBindGroupLayout(2),
+    entries: [
+      // { binding: 0, resource: { buffer: sorter.sort_info_buffer } },
+      // { binding: 1, resource: { buffer: sorter.ping_pong[0].sort_depths_buffer } },
+      { binding: 0, resource: { buffer: sorter.ping_pong[0].sort_indices_buffer } },
+      // { binding: 3, resource: { buffer: sorter.sort_dispatch_indirect_buffer } },
+    ],
+  });
 
   // ===============================================
   //    TODO: Command Encoder Functions
@@ -247,7 +276,7 @@ export default function get_renderer(
     pass.setPipeline(render_pipeline);
     pass.setBindGroup(0, camera_bind_group);
     pass.setBindGroup(1, gaussian_bind_group);
-    pass.setBindGroup(2, paramsBindGroup);   
+    pass.setBindGroup(2, sort_bind_group_renderer);
     pass.setBindGroup(3, render_splat_bind_group);
     // pass.setBindGroup(4, render_splat_idx_bind_group);
 
@@ -287,9 +316,7 @@ export default function get_renderer(
       prepass.dispatchWorkgroups(1, 1, 1);
       prepass.end();
 
-      
       sorter.sort(encoder);
-
       render(encoder, texture_view);
     },
     camera_buffer,
