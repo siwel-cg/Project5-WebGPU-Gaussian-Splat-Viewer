@@ -60,7 +60,8 @@ struct Gaussian {
 struct Splat {
     NDCpos: vec4<f32>,
     conic: vec3<f32>,
-    radius: f32
+    radius: f32,
+    color: vec3<f32>
 };
 
 //TODO: bind your data here
@@ -71,6 +72,8 @@ var<uniform> camera: CameraUniforms;
 
 @group(1) @binding(0)
 var<storage,read> gaussians : array<Gaussian>;
+@group(1) @binding(1)
+var<storage, read> sh_coeffs: array<u32>;
 
 // SORTS
 @group(2) @binding(0)
@@ -96,7 +99,31 @@ var<storage, read_write> indirect_params: array<u32>;
 /// reads the ith sh coef from the storage buffer 
 fn sh_coef(splat_idx: u32, c_idx: u32) -> vec3<f32> {
     //TODO: access your binded sh_coeff, see load.ts for how it is stored
-    return vec3<f32>(0.0);
+    let base_u32_idx = splat_idx * 24u;  // 24 u32s per gaussian
+    let coef_offset = c_idx * 3u;  // RGB for this coefficient
+    
+    // RGB are stored consecutively, so:
+    // coef 0: [R0, G0] in u32[0], [B0, R1] in u32[1]
+    // coef 1: [G1, B1] in u32[1], [R2, G2] in u32[2]
+    // etc.
+    
+    let u32_offset = coef_offset / 2u;
+    let is_even = (coef_offset % 2u) == 0u;
+    
+    let packed0 = sh_coeffs[base_u32_idx + u32_offset];
+    let packed1 = sh_coeffs[base_u32_idx + u32_offset + 1u];
+    
+    if (is_even) {
+        // [R, G] in packed0, [B, ?] in packed1
+        let rg = unpack2x16float(packed0);
+        let bx = unpack2x16float(packed1);
+        return vec3<f32>(rg.x, rg.y, bx.x);
+    } else {
+        // [?, R] in packed0, [G, B] in packed1
+        let xr = unpack2x16float(packed0);
+        let gb = unpack2x16float(packed1);
+        return vec3<f32>(xr.y, gb.x, gb.y);
+    }
 }
 
 // spherical harmonics evaluation with Condon–Shortley phase
@@ -240,18 +267,27 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let det = (cov.x * cov.z - cov.y * cov.y);
         if (det == 0.0f) { return; }
 
+        // CONIC
         let det_inv = 1.f / det;
         let conic = vec3f(cov.z * det_inv, -cov.y * det_inv, cov.x * det_inv);
 
+        // RADIUS
         let mid = 0.5f * (cov.x + cov.z);
         let lambda1 = mid + sqrt(max(0.1f, mid * mid - det));
         let lambda2 = mid - sqrt(max(0.1f, mid * mid - det));
-        let my_radius = ceil(3.f * sqrt(max(lambda1, lambda2)));
+        let radius = ceil(3.f * sqrt(max(lambda1, lambda2)));
 
+        // SH COLLORS
+        let cam_pos = camera.view_inv[3].xyz;
+        let view_dir = normalize(cam_pos - pos.xyz);
+        let sh_deg = 3u; // HARD CODED DEG FOR NOW, USE IN COMBO WITH THE OTHER THING
+        let color = computeColorFromSH(view_dir, idx, sh_deg);
+
+
+        // CHECK FOR BAD VALUES
         if (det <= 0.0001f) { 
-            return;  // Exit before writing anything
+            return;
         }
-
         let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
         if (culledIdx >= arrayLength(&splatIndexList)) {
             return;
@@ -260,7 +296,8 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         splatIndexList[culledIdx] = idx;
         splatList[idx].NDCpos = clipPos / clipPos.w;
         splatList[idx].conic = conic;
-        splatList[idx].radius = my_radius;// my_radius;
+        splatList[idx].radius = radius;
+        splatList[idx].color = color;
     }
 
     if (idx == 0u) {

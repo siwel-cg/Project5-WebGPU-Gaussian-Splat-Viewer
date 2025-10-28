@@ -59,10 +59,11 @@ export default function get_renderer(
   });
 
   const gaussian_bind_group_preprocess = device.createBindGroup({
-    label: 'point gaussians',
+    label: 'point gaussians prepass',
     layout: preprocess_pipeline.getBindGroupLayout(1),
     entries: [
       {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
+      {binding: 1, resource: { buffer: pc.sh_buffer }},
     ],
   });
 
@@ -120,7 +121,7 @@ export default function get_renderer(
     label: 'point gaussians',
     layout: render_pipeline.getBindGroupLayout(1),
     entries: [
-      {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
+      {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }}
     ],
   });
 
@@ -141,7 +142,7 @@ export default function get_renderer(
   // SPLAT BUFFER FOR PREPROCESSING AND RENDERING
   const splat_buffer = device.createBuffer({
     label: 'splat buffer',
-    size: pc.num_points * 32,
+    size: pc.num_points * 48,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   });
 

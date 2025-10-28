@@ -1,6 +1,7 @@
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) radius: f32
+    @location(0) radius: f32, 
+    @location(1) color: vec3<f32>
     //TODO: information passed from vertex shader to fragment shader
 };
 
@@ -11,7 +12,8 @@ struct VertexInput {
 struct Splat {
     NDCpos: vec4<f32>,
     conic: vec3<f32>,
-    radius: f32
+    radius: f32,
+    color: vec3<f32>
 };
 
 struct CameraUniforms {
@@ -29,7 +31,7 @@ struct Gaussian {
     pos_opacity: array<u32,2>,
     rot: array<u32,2>,
     scale: array<u32,2>
-}
+};
 
 struct gaussParams{
     gaussian_mult: f32
@@ -85,26 +87,12 @@ fn vs_main(in : VertexInput, @builtin(instance_index) instance: u32,
 
     out.position = vec4<f32>(new_xyclip, clipPos.z, clipPos.w);
     out.radius = rad;
+    out.color = splatList[culledIndex].color;
 
     return out;
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let normalized_radius = clamp(in.radius / 100.0, 0.0, 1.0);
-    
-    // Create a color gradient based on radius
-    var color: vec3<f32>;
-    if (in.radius < 20.0) {
-        color = vec3<f32>(0.0, 0.0, 1.0);  // Blue for small
-    } else if (in.radius < 50.0) {
-        color = vec3<f32>(0.0, 1.0, 0.0);  // Green for medium
-    } else {
-        color = vec3<f32>(1.0, 0.0, 0.0);  // Red for large
-    }
-    
-    // Or use a smooth gradient:
-    color = vec3<f32>(normalized_radius, 1.0 - normalized_radius, 0.5);
-    
-    return vec4<f32>(color, 1.0);
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {    
+    return vec4<f32>(in.color, 1.0);
 }
