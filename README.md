@@ -14,11 +14,7 @@
 
 # Demo Video
 
-<video controls loop muted playsinline width="720"
-       src="./images/GSBikeDemo_V1.mp4?raw=1"
-       poster="./images/Bicycle_GS_V1.png?raw=1">
-  <a href="./images/GSBikeDemo_V1.mp4?raw=1">Download MP4</a>
-</video>
+[![Demo](images/Bicycle_GS_V1.png)](https://youtu.be/FcsVPEqJQR4)
 
 ## A NOTE TO THE GRADERS
 As you can see from the images/video/live demo, this doesn't exactly look as photorealistic as I promis Gaussian splatting should be or you would expect. General problems: (1) My radius calculation seems to be off. There isn't that much variation in the size of the quads. This makes all the splats look relatively the same and you don't get nice LOD. (2) Each splat is very distinct, so I assume there is something wrong with my covaraince calculations causing the variance to not be as nice of a falloff as we need. That or by conforming the covariance to the size of the quad it "sqishes" that falloff down into a much smaller area. (3) If you play around with the live demo or watch the video, you will notice if zoomed out enough, a large portion of the scene disapears and you get lots of flashing splats. This might be a problem with the culling where some depth check goes wrong, but I'm not exactly sure since it isn't a smooth falloff fo disapearing splats, they just are all there or all gone. Not the result you would expect from a far plane culling. 
@@ -27,7 +23,7 @@ Due to time constraints, these won't get fixed untill later, but that is my gene
 
 # Overview
 Gaussian Splatting is a recent neural rendering technique for reconstructing photorealistic scenes from posed images. Instead of representing the scene with dense voxels or a full neural field (as in NeRF), the method stores the scene as a set of 3D Gaussians, each with position, color, opacity, and covariance that encodes local geometric shape. During rendering, these Gaussians are projected to the screen as textured quads and blended using alpha compositing in screen space. Basically, it is a dense set of "fuzzy" elipsoids which blend togeather to form the image. Because all computation happens in rasterization rather than volume ray-marching, Gaussian Splatting achieves fast real-time rendering with high fidelity.
-For more information, here is the ![original paper on Gaussian Splatting](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf).
+For more information, here is the [original paper on Gaussian Splatting](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf).
 
 In this project I implemented a WebGPU based splat viewer which takes in a .ply splat file. There are three main passes. First, we preprocess the gaussian point cloud, computing the color, covariance, opacity, quad size, and NDC position for all of our splats. During this, some simple frustrum culling is used to increase render speeds in large scenes. The positional data for each splat is then sent to a GPU Radix sort implementation for depth sorting. This is crucial for the final rendering stage where a vertex buffer creates the screen oriented quads, and a fragment shader shades the quads with our Gaussian data. 
 
