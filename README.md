@@ -9,7 +9,8 @@
 # Live Demo
 
 [LIVE DEMO](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
-[![](../Project5-WebGPU-Gaussian-Splat-Viewer/images/Bicycle_GS_V1.png)](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
+
+[![RenderLink](images/Bicycle_GS_V1.png)](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
 
 # Demo Video/GIF
 
@@ -23,10 +24,8 @@ In this project I implemented a WebGPU based splat viewer which takes in a .ply 
 # Point Clouds
 As mentioned, the input to the method is simply a set of 3D points with attributes such as color or normals. This raw representation is sparse and discontinuous, but as you will see later, is enough to cover the entire scene when the splats are applied.
 
-<p align="center">
-  <img src="images/Bicycle_pointcloud_V1.png" alt="Bicycle Point Cloud" width="45%" />
-  <img src="images/bonsai_pointcloud_V1.png" alt="Bonsai Point Cloud" width="45%" />
-</p>
+![bike points](images/Bicycle_pointcloud_V1.png)
+![tree points](images/bonsai_pointcloud_V1.png)
 
 # Gaussian Splatting
 Now that we have a basic point cloud system working, we can start the Splat pipeline:
@@ -34,17 +33,17 @@ Now that we have a basic point cloud system working, we can start the Splat pipe
 ## Quads
 The first step is creating a quad for each point where we will eventually render the splats. Each Gaussian in 3D is rendered on screen as a screen-aligned quad whose extent approximates the projected footprint of the Gaussian ellipsoid. After projecting the Gaussian center to NDC, we compute its covariance in screen space and derive a 2×2 ellipse. The quad is then chosen large enough to tightly bound this ellipse so that the Gaussian falloff can be evaluated in the fragment shader.
 
-![quads](images/quad_green.png)
+![quads](images/Bicycle_SizedQuads_V1.png)
 
 ## Colors and Covariance
 Each Gaussian carries two main components:
 
-**(1) Appearance**  
+**Appearance**  
 Each splat stores spherical harmonic coefficients instead of a fixed RGB value. At render time we look up the view direction and evaluate the SH basis to get a view-dependent color. This allows the splat to reproduce effects that vary with angle without storing a full BRDF or running a lighting pass.
 
 ![color1](images/Bicycle_DepthSorted_V1.png)
 
-**(2) Covariance**  
+**Covariance**  
 The covariance matrix encodes the anisotropic shape of the Gaussian ellipsoid in 3D. Unlike a
 uniform point radius, this allows each primitive to stretch or flatten along directions that
 best approximate local geometry. Before rasterization, the 3D covariance is pushed through the
