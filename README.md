@@ -14,14 +14,7 @@
 
 # Demo Video
 
-<iframe
-  width="800" height="450"
-  src="https://youtu.be/FcsVPEqJQR4"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-  allowfullscreen>
-</iframe>
+[![Watch the video](https://img.youtube.com/vi/FcsVPEqJQR4/hqdefault.jpg)](https://www.youtube.com/watch?v=FcsVPEqJQR4)
 
 ## A NOTE TO THE GRADERS
 As you can see from the images/video/live demo, this doesn't exactly look as photorealistic as I promis Gaussian splatting should be or you would expect. General problems: (1) My radius calculation seems to be off. There isn't that much variation in the size of the quads. This makes all the splats look relatively the same and you don't get nice LOD. (2) Each splat is very distinct, so I assume there is something wrong with my covaraince calculations causing the variance to not be as nice of a falloff as we need. That or by conforming the covariance to the size of the quad it "sqishes" that falloff down into a much smaller area. (3) If you play around with the live demo or watch the video, you will notice if zoomed out enough, a large portion of the scene disapears and you get lots of flashing splats. This might be a problem with the culling where some depth check goes wrong, but I'm not exactly sure since it isn't a smooth falloff fo disapearing splats, they just are all there or all gone. Not the result you would expect from a far plane culling. 
