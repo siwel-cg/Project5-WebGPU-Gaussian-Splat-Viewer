@@ -14,12 +14,12 @@
 
 # Demo Video
 
-[![Watch the video](https://img.youtube.com/vi/FcsVPEqJQR4/hqdefault.jpg)](https://www.youtube.com/watch?v=FcsVPEqJQR4)
+[![Watch the video](images/Bicycle_GS_V1.png)](https://www.youtube.com/watch?v=FcsVPEqJQR4)
 
 ## A NOTE TO THE GRADERS
-As you can see from the images/video/live demo, this doesn't exactly look as photorealistic as I promis Gaussian splatting should be or you would expect. General problems: (1) My radius calculation seems to be off. There isn't that much variation in the size of the quads. This makes all the splats look relatively the same and you don't get nice LOD. (2) Each splat is very distinct, so I assume there is something wrong with my covaraince calculations causing the variance to not be as nice of a falloff as we need. That or by conforming the covariance to the size of the quad it "sqishes" that falloff down into a much smaller area. (3) If you play around with the live demo or watch the video, you will notice if zoomed out enough, a large portion of the scene disapears and you get lots of flashing splats. This might be a problem with the culling where some depth check goes wrong, but I'm not exactly sure since it isn't a smooth falloff fo disapearing splats, they just are all there or all gone. Not the result you would expect from a far plane culling. 
+As you can see from the images/video/live demo, this doesn't exactly look as photorealistic as I promis Gaussian splatting should be or you would expect. General problems: (1) My radius calculation seems to be off. There isn't that much variation in the size of the quads. This makes all the splats look relatively the same and you don't get nice LOD. (2) Each splat is very distinct, so I assume there is something wrong with my covaraince calculations causing the variance to not be as nice of a falloff as we need. That or by conforming the covariance to the size of the quad it "sqishes" that falloff down into a much smaller area. (3) If you play around with the live demo or watch the video, you will notice if zoomed out enough, a large portion of the scene disapears and you get lots of flashing splats. This is due to some problem with my intermediate index buffer / culling. If you take away the bounds check in the if statement (ie remove culling) we don't get the full scene like you would expect.
 
-Due to time constraints, these won't get fixed untill later, but that is my general guess as to whats going wrong and where I need to look to fix it.
+Due to time constraints, these won't get fixed untill later, but that is my general guess as to whats going wrong and where I need to look to fix it. Sorry. 
 
 # Overview
 Gaussian Splatting is a recent neural rendering technique for reconstructing photorealistic scenes from posed images. Instead of representing the scene with dense voxels or a full neural field (as in NeRF), the method stores the scene as a set of 3D Gaussians, each with position, color, opacity, and covariance that encodes local geometric shape. During rendering, these Gaussians are projected to the screen as textured quads and blended using alpha compositing in screen space. Basically, it is a dense set of "fuzzy" elipsoids which blend togeather to form the image. Because all computation happens in rasterization rather than volume ray-marching, Gaussian Splatting achieves fast real-time rendering with high fidelity.
@@ -64,6 +64,9 @@ Together, the falloff from the 2D covariance and the color get mapped to each co
 ![Tree](images/Bonsai_GS_V1.png)
 
 # Performance Analysis
+Similar to last homework, it seems somewhat irelivant to do performance analysis on an implementation that is very obviously not correct and will be changed. That being said, I did do a bit of testing. For both the clean bike scene and the bonsai scene, the point cloud rendering got a pretty consistent 60 fps regarless of zoom or movement.  I don't have a clear reason as to why this may be happening, but it might be due to the size of the quads taking up more screen space and the number of splats being drawn changing rapidly.
+
+When trying to test different work group sizes, something with the culling/indexing wen wild and many of the splats would flash. 
 
 ### Credits
 

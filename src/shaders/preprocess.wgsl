@@ -199,13 +199,10 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
     let clipPos = camera.proj * viewPos;
 
     // CULLING
-    let w = clipPos.w;
-    let margin = 1.2;
-
-    if (w > 0.0 &&  
-        clipPos.x >= -w * margin && clipPos.x <= w * margin &&
-        clipPos.y >= -w * margin && clipPos.y <= w * margin && 
-        clipPos.z >= 0.0 && clipPos.z <= w) {
+    if (clipPos.w  > 0.0 &&  
+        clipPos.x >= -clipPos.w * 1.2 && clipPos.x <= clipPos.w * 1.2 &&
+        clipPos.y >= -clipPos.w * 1.2 && clipPos.y <= clipPos.w * 1.2 && 
+        clipPos.z >= 0.0 && clipPos.z <= clipPos.w ) {
         
         // CALCULATE COV
         let normRot = normalize(rot);
@@ -277,7 +274,6 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let sh_deg = 3u; // HARD CODED DEG FOR NOW, USE IN COMBO WITH THE OTHER THING
         let color = computeColorFromSH(view_dir, idx, sh_deg);
 
-
         // CHECK FOR BAD VALUES
         if (det <= 0.0001f) { 
             return;
@@ -294,8 +290,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         splatList[idx].color = color;
         splatList[idx].opacity = b.y;
 
-        // STORE DEPTH AND INDICES FOR 
-
+        // STORE DEPTH AND INDICES FOR SORTING LATTER
         let u = bitcast<u32>(-viewPos.z);
         let mask = select(0xFFFFFFFFu, 0x80000000u, (u & 0x80000000u) == 0u);
         let depth_uint = u ^ mask;
