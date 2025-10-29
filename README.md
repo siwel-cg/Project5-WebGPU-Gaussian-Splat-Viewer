@@ -12,9 +12,18 @@
 
 [![RenderLink](images/Bicycle_GS_V1.png)](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
 
-# Demo Video/GIF
+# Demo Video
 
-[![](img/video.mp4)](TODO)
+<video src="images/GSBikeDemo_V1.mp4"
+       controls
+       loop
+       muted
+       playsinline
+       width="720"
+       poster="images/Bicycle_GS_V1.png">
+  Sorry—your browser can’t play this video. Here’s a
+  <a href="images/GSBikeDemo_V1.mp4">direct link</a>.
+</video>
 
 # Overview
 Gaussian Splatting is a recent neural rendering technique for reconstructing photorealistic scenes from posed images. Instead of representing the scene with dense voxels or a full neural field (as in NeRF), the method stores the scene as a set of 3D Gaussians, each with position, color, opacity, and covariance that encodes local geometric shape. During rendering, these Gaussians are projected to the screen as textured quads and blended using alpha compositing in screen space. Basically, it is a dense set of "fuzzy" elipsoids which blend togeather to form the image. Because all computation happens in rasterization rather than volume ray-marching, Gaussian Splatting achieves fast real-time rendering with high fidelity.
@@ -66,3 +75,4 @@ Together, the falloff from the 2D covariance and the color get mapped to each co
 - [stats.js](https://github.com/mrdoob/stats.js)
 - [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
 - Special Thanks to: Shrek Shao (Google WebGPU team) & [Differential Guassian Renderer](https://github.com/graphdeco-inria/diff-gaussian-rasterization)
+
