@@ -75,6 +75,8 @@ var<uniform> camera: CameraUniforms;
 var<storage,read> gaussians : array<Gaussian>;
 @group(1) @binding(1)
 var<storage, read> sh_coeffs: array<u32>;
+@group(1) @binding(2)
+var<uniform> gauss_mult: f32;
 
 // SORTS
 @group(2) @binding(0)
@@ -217,7 +219,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
             2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
         );
 
-        let gaussian_mult = 1.0; // CHANGE TO GAUSSIAN_MULTIPLIER LATER
+        let gaussian_mult = gauss_mult; // CHANGE TO GAUSSIAN_MULTIPLIER LATER
         let S = mat3x3f(
             gaussian_mult * scale.x, 0.0, 0.0,
             0.0, gaussian_mult * scale.y, 0.0,
@@ -278,6 +280,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         if (det <= 0.0001f) { 
             return;
         }
+
         let culledIdx = atomicAdd(&sort_infos.keys_size, 1u);
         if (culledIdx >= arrayLength(&splatIndexList)) {
             return;

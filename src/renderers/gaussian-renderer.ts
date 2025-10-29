@@ -58,12 +58,24 @@ export default function get_renderer(
     entries: [{binding: 0, resource: { buffer: camera_buffer }}],
   });
 
+    // GAUSSIAN MULT BUFFER + UPDATE
+  const paramsBuffer = device.createBuffer({
+    label: 'params buffer',
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+
+  function setGaussianMultiplier(gmult: number) {
+    device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([gmult]));
+  }
+
   const gaussian_bind_group_preprocess = device.createBindGroup({
     label: 'point gaussians prepass',
     layout: preprocess_pipeline.getBindGroupLayout(1),
     entries: [
       {binding: 0, resource: { buffer: pc.gaussian_3d_buffer }},
       {binding: 1, resource: { buffer: pc.sh_buffer }},
+      {binding: 2, resource: { buffer: paramsBuffer}}
     ],
   });
 
@@ -217,25 +229,6 @@ export default function get_renderer(
   //   ]
   // });
 
-  // GAUSSIAN MULT BUFFER + UPDATE
-  const paramsBuffer = device.createBuffer({
-    label: 'params buffer',
-    size: 16,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  });
-
-
-  // I DON"T NEED TO BIND IT TO THE RENDERER, ONLY TO THE PREPASS
-  // const paramsBindGroup = device.createBindGroup({
-  //   label: 'gauss mult bind group',
-  //   layout: render_pipeline.getBindGroupLayout(2),
-  //   entries: [{ binding: 0, resource: { buffer: paramsBuffer } }]
-  // });
-
-  function setGaussianMultiplier(gmult: number) {
-    device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([gmult]));
-  }
-
   // BIND SORT BUFFERS TO RENDERER:
   const sort_bind_group_renderer = device.createBindGroup({
     label: 'renderer sort',
@@ -317,6 +310,7 @@ export default function get_renderer(
       prepass.end();
 
       sorter.sort(encoder);
+
       render(encoder, texture_view);
     },
     camera_buffer,
