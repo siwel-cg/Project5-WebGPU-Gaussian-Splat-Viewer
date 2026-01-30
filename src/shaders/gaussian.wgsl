@@ -120,7 +120,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let conZ = in.conic.z;
     let d = in.uv;
     
-    let power = -0.5f * (conX * d.x * d.x + conZ * d.y * d.y) - conY * d.x * d.y;
+    //let power = -0.5f * (conX * d.x * d.x + conZ * d.y * d.y) - conY * d.x * d.y;
+    let power = -0.5 * (conX * d.x * d.x + 2.0 * conY * d.x * d.y + conZ * d.y * d.y);
     if (power > 0.0) {
         discard;
     }
@@ -128,6 +129,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (alpha < 1.0 / 255.0) {
         discard;
     }
+
 
     return vec4<f32>(in.color * alpha, alpha);
 }

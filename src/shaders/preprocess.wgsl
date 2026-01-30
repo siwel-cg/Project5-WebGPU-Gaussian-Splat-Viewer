@@ -191,7 +191,8 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
 
     let s1 = unpack2x16float(vertex.scale[0]);
     let s2 = unpack2x16float(vertex.scale[1]);
-    let scale = vec4<f32>(s1.x, s1.y, s2.x, 1.0);
+    //let scale = vec4<f32>(s1.x, s1.y, s2.x, 1.0);
+    let scale = exp(vec3<f32>(s1.x, s1.y, s2.x));
 
     let r1 = unpack2x16float(vertex.rot[0]);
     let r2 = unpack2x16float(vertex.rot[1]);
@@ -213,11 +214,17 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let y = normRot.z;
         let z = normRot.w;
 
-        let R = mat3x3f(
+        // let R = mat3x3f(
+        //     1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
+        //     2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
+        //     2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
+        // );
+
+        let R = transpose(mat3x3f(
             1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
             2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
             2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
-        );
+        ));
 
         let gaussian_mult = gauss_mult; // CHANGE TO GAUSSIAN_MULTIPLIER LATER
         let S = mat3x3f(
@@ -226,35 +233,60 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
             0.0, 0.0, gaussian_mult * scale.z
         );
 
-        let M = S * R;
+        let M = R * S;
+        let Sigma3D = M * transpose(M);
 
-        let Sigma3D = transpose(M) * M;
+        // let W = mat3x3f(
+        //     camera.view[0][0], camera.view[0][1], camera.view[0][2],
+        //     camera.view[1][0], camera.view[1][1], camera.view[1][2],
+        //     camera.view[2][0], camera.view[2][1], camera.view[2][2]
+        // );
+        // let fx = camera.proj[0][0];
+        // let fy = abs(camera.proj[1][1]);
+        // let J = mat3x3f(
+        //     fx / viewPos.z, 0.0f, -(fx * viewPos.x) / (viewPos.z * viewPos.z),
+        //     0.0f, fy / viewPos.z, -(fy * viewPos.y) / (viewPos.z * viewPos.z),
+        //     0, 0, 0
+        // );
+        // // let cov3D = mat3x3f(
+        // //     Sigma3D[0][0], Sigma3D[0][1], Sigma3D[0][2],
+        // //     Sigma3D[1][0], Sigma3D[1][1], Sigma3D[1][2],
+        // //     Sigma3D[2][0], Sigma3D[2][1], Sigma3D[2][2]
+        // // );
+        // var Sigma2D = J * W * Sigma3D * transpose(W) * transpose(J);
+        // Sigma2D[0][0] += 0.3f;
+        // Sigma2D[1][1] += 0.3f;
+        // let W = mat3x3f(
+        //     camera.view[0][0], camera.view[0][1], camera.view[0][2],
+        //     camera.view[1][0], camera.view[1][1], camera.view[1][2],
+        //     camera.view[2][0], camera.view[2][1], camera.view[2][2]
+        // );
 
         let W = mat3x3f(
-            camera.view[0][0], camera.view[0][1], camera.view[0][2],
-            camera.view[1][0], camera.view[1][1], camera.view[1][2],
-            camera.view[2][0], camera.view[2][1], camera.view[2][2]
+            camera.view[0].xyz,
+            camera.view[1].xyz,
+            camera.view[2].xyz
         );
 
-        let fx = camera.proj[0][0];
-        let fy = abs(camera.proj[1][1]);
+        // Use PIXEL focal lengths, not projection matrix values!
+        let fx = camera.focal.y;  // focal_x stored in focal[1]
+        let fy = camera.focal.x;  // focal_y stored in focal[0]
+
+        let tz = viewPos.z;
+        let tz2 = tz * tz;
 
         let J = mat3x3f(
-            fx / viewPos.z, 0.0f, -(fx * viewPos.x) / (viewPos.z * viewPos.z),
-            0.0f, fy / viewPos.z, -(fy * viewPos.y) / (viewPos.z * viewPos.z),
-            0, 0, 0
+            fx / tz, 0.0, -fx * viewPos.x / tz2,
+            0.0, fy / tz, -fy * viewPos.y / tz2,
+            0.0, 0.0, 0.0
         );
 
-        let T = W * J;
-        let cov3D = mat3x3f(
-            Sigma3D[0][0], Sigma3D[0][1], Sigma3D[0][2],
-            Sigma3D[1][0], Sigma3D[1][1], Sigma3D[1][2],
-            Sigma3D[2][0], Sigma3D[2][1], Sigma3D[2][2]
-        );
+        let T = J * W;
+        var Sigma2D = T * Sigma3D * transpose(T);
 
-        var Sigma2D = transpose(T) * transpose(cov3D) * T;
-        Sigma2D[0][0] += 0.3f;
-        Sigma2D[1][1] += 0.3f;
+        // Low-pass filter (in pixel space, 0.3 pixels is reasonable)
+        // Sigma2D[0][0] += 0.3;
+        // Sigma2D[1][1] += 0.3;
 
         let cov = vec3f(Sigma2D[0][0], Sigma2D[0][1], Sigma2D[1][1]);
         let det = (cov.x * cov.z - cov.y * cov.y);
@@ -291,7 +323,8 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         splatList[idx].conic = conic;
         splatList[idx].radius = radius;
         splatList[idx].color = color;
-        splatList[idx].opacity = b.y;
+        //splatList[idx].opacity = b.y;
+        splatList[idx].opacity = 1.0 / (1.0 + exp(-b.y));
 
         // STORE DEPTH AND INDICES FOR SORTING LATTER
         let u = bitcast<u32>(-viewPos.z);
