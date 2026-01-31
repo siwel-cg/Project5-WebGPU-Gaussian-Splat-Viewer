@@ -281,7 +281,7 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         let fx = f;
         let fy = f;
 
-        let tz = (viewPos.z);
+        let tz = viewPos.z;
         let tz2 = tz * tz;
 
         let J = mat3x3f(

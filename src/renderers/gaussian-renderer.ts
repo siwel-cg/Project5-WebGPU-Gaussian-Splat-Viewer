@@ -306,7 +306,7 @@ export default function get_renderer(
 
       const numGroups = Math.ceil(pc.num_points / 256);
       prepass.dispatchWorkgroups(numGroups, 1, 1);
-      //prepass.dispatchWorkgroups(1, 1, 1);
+      prepass.dispatchWorkgroups(1, 1, 1);
       prepass.end();
 
       sorter.sort(encoder);
