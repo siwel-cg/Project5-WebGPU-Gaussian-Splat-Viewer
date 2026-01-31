@@ -262,17 +262,26 @@ fn preprocess(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgr
         //     camera.view[2][0], camera.view[2][1], camera.view[2][2]
         // );
 
-        let W = mat3x3f(
+        // let W = mat3x3f(
+        //     camera.view[0].xyz,
+        //     camera.view[1].xyz,
+        //     camera.view[2].xyz
+        // );
+
+        let W = transpose(mat3x3f(
             camera.view[0].xyz,
             camera.view[1].xyz,
             camera.view[2].xyz
-        );
+        ));
 
         // Use PIXEL focal lengths, not projection matrix values!
-        let fx = camera.focal.y;  // focal_x stored in focal[1]
-        let fy = camera.focal.x;  // focal_y stored in focal[0]
+        // let fx = camera.focal.y;  // focal_x stored in focal[1]
+        // let fy = camera.focal.x;  // focal_y stored in focal[0]
+        let f = camera.focal.x;  // just use one focal length
+        let fx = f;
+        let fy = f;
 
-        let tz = viewPos.z;
+        let tz = (viewPos.z);
         let tz2 = tz * tz;
 
         let J = mat3x3f(
