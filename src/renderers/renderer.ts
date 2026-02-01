@@ -82,7 +82,10 @@ export default async function init(
     .on('change', async (file) => {
       const uploadedFile = file.value;
       if (uploadedFile) {
-        const pc = await load(uploadedFile, device);
+        const pc = await load(uploadedFile, device); // THIS WHERE WE LOAD FILE
+        control.setTarget(pc.centroid, pc.radius * 2.5);
+        camera.update_buffer();
+
         pointcloud_renderer = get_renderer_pointcloud(pc, device, presentation_format, camera.uniform_buffer);
         gaussian_renderer = get_renderer_gaussian(pc, device, presentation_format, camera.uniform_buffer);
         gaussian_renderer.setGaussianMultiplier(params.gaussian_multiplier);
@@ -108,7 +111,7 @@ export default async function init(
       const uploadedFile = file.value;
       if (uploadedFile) {
         cameras=await load_camera_presets(file.value);
-        camera.set_preset(cameras[0]);
+        //camera.set_preset(cameras[0]);
         cam_file_loaded = true;
       }else{
         cam_file_loaded = false;

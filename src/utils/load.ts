@@ -1,6 +1,7 @@
 import { Float16Array } from '@petamoriken/float16';
 import { log, time, timeLog } from './simple-console';
 import { decodeHeader, readRawVertex ,nShCoeffs} from './plyreader';
+import { vec3 } from 'wgpu-matrix';
 
 const c_size_float = 2;   // byte size of f16
 
@@ -78,6 +79,10 @@ export async function load(file: string, device: GPUDevice) {
   });
   const sh = new Float16Array(sh_buffer.getMappedRange());
 
+  var minX = Infinity, minY = Infinity, minZ = Infinity;
+  var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  var sumX = 0, sumY = 0, sumZ = 0;
+
   var readOffset = 0;
   for (let i = 0; i < num_points; i++) {
     const [newReadOffset, rawVertex] = readRawVertex(readOffset, vertexData, propertyTypes);
@@ -93,6 +98,20 @@ export async function load(file: string, device: GPUDevice) {
             sh[output_offset +order_offset+j]=rawVertex[coeffName];
         }
     }
+
+    const x = rawVertex.x;
+    const y = rawVertex.y;
+    const z = rawVertex.z;
+
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
+    sumX += x;
+    sumY += y;
+    sumZ += z;
 
     gaussian[o + 0] = rawVertex.x;
     gaussian[o + 1] = rawVertex.y;
@@ -110,6 +129,14 @@ export async function load(file: string, device: GPUDevice) {
   gaussian_3d_buffer.unmap(); 
   sh_buffer.unmap();
 
+// In load.ts, let's make sure we're creating the centroid correctly
+  const centroid = vec3.create(
+    sumX / num_points,
+    sumY / num_points,
+    sumZ / num_points
+  );
+  const radius = Math.max(maxX - minX, maxY - minY, maxZ - minZ) / 2.0;
+
   timeLog();
   console.log("return result!");
   return {
@@ -117,5 +144,7 @@ export async function load(file: string, device: GPUDevice) {
     sh_deg: sh_deg,
     gaussian_3d_buffer,
     sh_buffer,
+    centroid,
+    radius
   };
 }
