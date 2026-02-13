@@ -1,78 +1,65 @@
-# Project5-WebGPU-Gaussian-Splat-Viewer
+# WebGPU Gaussian Splat Viewer
 
-**University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 5**
+**[Live Demo](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)**
 
-* Lewis Ghrist
-* [Personal Website](https://siwel-cg.github.io/siwel.cg_websiteV1/index.html#home), [LinkedIn](https://www.linkedin.com/in/lewis-ghrist-4b1b3728b/)
-* Tested on: Windows 11, AMD Ryzen 9 5950X 16-Core Processor, 64GB, NVIDIA GeForce RTX 3080 10GB
+![Gaussian Splat Render (Bicycle)](images/Bicycle_GS_V2.png)
 
-# Live Demo
+## Overview
 
-[LIVE DEMO](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
+**Gaussian Splatting** is a neural rendering technique for reconstructing scenes from posed images. Instead of dense voxels or a full neural field (e.g., NeRF), the scene is represented as a set of *3D Gaussians*. Each Gaussian stores position, color, opacity, and a covariance that encodes local geometric shape. During rendering, Gaussians are projected to the screen as textured quads and blended using alpha compositing in screen space.
 
-[![RenderLink](images/Bicycle_GS_V1.png)](https://siwel-cg.github.io/Project5-WebGPU-Gaussian-Splat-Viewer/)
+This project is a **WebGPU-based splat viewer** that loads a `.ply` splat file and renders it in real time. The pipeline has three main stages:
 
-# Demo Video
+1. **Preprocess** the Gaussian point cloud (color, covariance, opacity, quad size, NDC position), with simple frustum culling.
+2. **Depth sort** splats using a GPU radix sort implementation.
+3. **Render** screen-oriented quads and shade them with Gaussian falloff in the fragment shader, composited back-to-front.
 
-[![Watch the video](images/Bicycle_GS_V1.png)](https://www.youtube.com/watch?v=FcsVPEqJQR4)
+For more information, see the [original 3D Gaussian Splatting paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf).
 
-## A NOTE TO THE GRADERS
-As you can see from the images/video/live demo, this doesn't exactly look as photorealistic as I promis Gaussian splatting should be or you would expect. General problems: (1) My radius calculation seems to be off. There isn't that much variation in the size of the quads. This makes all the splats look relatively the same and you don't get nice LOD. (2) Each splat is very distinct, so I assume there is something wrong with my covaraince calculations causing the variance to not be as nice of a falloff as we need. That or by conforming the covariance to the size of the quad it "sqishes" that falloff down into a much smaller area. (3) If you play around with the live demo or watch the video, you will notice if zoomed out enough, a large portion of the scene disapears and you get lots of flashing splats. This is due to some problem with my intermediate index buffer / culling. If you take away the bounds check in the if statement (ie remove culling) we don't get the full scene like you would expect.
+## Point Clouds
 
-Due to time constraints, these won't get fixed untill later, but that is my general guess as to whats going wrong and where I need to look to fix it. Sorry. 
+The input is a set of 3D points with attributes (e.g., color, normals). While this representation is sparse and discontinuous, it becomes visually dense once each point is rendered as a Gaussian splat.
 
-# Overview
-Gaussian Splatting is a recent neural rendering technique for reconstructing photorealistic scenes from posed images. Instead of representing the scene with dense voxels or a full neural field (as in NeRF), the method stores the scene as a set of 3D Gaussians, each with position, color, opacity, and covariance that encodes local geometric shape. During rendering, these Gaussians are projected to the screen as textured quads and blended using alpha compositing in screen space. Basically, it is a dense set of "fuzzy" elipsoids which blend togeather to form the image. Because all computation happens in rasterization rather than volume ray-marching, Gaussian Splatting achieves fast real-time rendering with high fidelity.
-For more information, here is the [original paper on Gaussian Splatting](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf).
+| Bicycle | Bonsai |
+|---------|--------|
+| ![Bicycle point cloud](images/Bicycle_pointcloud_V1.png) | ![Bonsai point cloud](images/bonsai_pointcloud_V1.png) |
 
-In this project I implemented a WebGPU based splat viewer which takes in a .ply splat file. There are three main passes. First, we preprocess the gaussian point cloud, computing the color, covariance, opacity, quad size, and NDC position for all of our splats. During this, some simple frustrum culling is used to increase render speeds in large scenes. The positional data for each splat is then sent to a GPU Radix sort implementation for depth sorting. This is crucial for the final rendering stage where a vertex buffer creates the screen oriented quads, and a fragment shader shades the quads with our Gaussian data. 
+## Gaussian Splatting
 
-# Point Clouds
-As mentioned, the input to the method is simply a set of 3D points with attributes such as color or normals. This raw representation is sparse and discontinuous, but as you will see later, is enough to cover the entire scene when the splats are applied.
+### Quads
 
-![bike points](images/Bicycle_pointcloud_V1.png)
-![tree points](images/bonsai_pointcloud_V1.png)
+Each 3D Gaussian is projected to the screen and rendered as a **screen-aligned quad** whose size bounds the Gaussian's projected ellipse. After projecting the Gaussian center to NDC, we compute a screen-space covariance and derive a 2×2 ellipse. The quad is chosen large enough to cover this ellipse so that the Gaussian falloff can be evaluated per-pixel in the fragment shader.
 
-# Gaussian Splatting
-Now that we have a basic point cloud system working, we can start the Splat pipeline:
+![Screen-aligned quads](images/Bicycle_DepthSorted_V2.png)
+*Screen-aligned quads sized to bound each splat's projected footprint.*
 
-## Quads
-The first step is creating a quad for each point where we will eventually render the splats. Each Gaussian in 3D is rendered on screen as a screen-aligned quad whose extent approximates the projected footprint of the Gaussian ellipsoid. After projecting the Gaussian center to NDC, we compute its covariance in screen space and derive a 2×2 ellipse. The quad is then chosen large enough to tightly bound this ellipse so that the Gaussian falloff can be evaluated in the fragment shader.
+### Colors and Covariance
 
-![quads](images/Bicycle_SizedQuads_V1.png)
+**Appearance:** Instead of storing a fixed RGB value per splat, each splat stores **spherical harmonic (SH) coefficients**. At render time, the view direction selects an SH evaluation to produce view-dependent color.
 
-## Colors and Covariance
-Each Gaussian carries two main components:
+**Covariance:** The covariance matrix encodes the anisotropic shape of the Gaussian ellipsoid in 3D. Before rasterization, the 3D covariance is transformed to a 2D covariance in screen space, which dictates the falloff profile across the quad. After preprocessing, splats are **sorted back-to-front** for correct alpha compositing.
 
-**Appearance**  
-Each splat stores spherical harmonic coefficients instead of a fixed RGB value. At render time we look up the view direction and evaluate the SH basis to get a view-dependent color. This allows the splat to reproduce effects that vary with angle without storing a full BRDF or running a lighting pass.
+![Depth-sorted splats](images/Splat_Elipses.png)
+*Depth-sorted splats without alpha blending.*
 
-![color1](images/Bicycle_DepthSorted_V1.png)
+## Output
 
-**Covariance**  
-The covariance matrix encodes the anisotropic shape of the Gaussian ellipsoid in 3D. Unlike a
-uniform point radius, this allows each primitive to stretch or flatten along directions that
-best approximate local geometry. Before rasterization, the 3D covariance is pushed through the
-camera transform to produce a 2D covariance in screen space. That matrix dictates the falloff
-profile of the Gaussian across the quad’s pixels. 
+| Bicycle | Bonsai |
+|---------|--------|
+| ![Bicycle output](images/Bicycle_GS_V2.png) | ![Bonsai output](images/Bonsai_GS_V2.png) |
 
-Together, the falloff from the 2D covariance and the color get mapped to each corrisponding quad similar to a texture. Before doing our final render pass, all the positions are sorted back to front for propper alpha blending when the splats get stacked up togeather. 
+## Built With
 
-# Output
-![bike](images/Bicycle_GS_V1.png)
+- WebGPU
+- TypeScript
+- WGSL
 
-![Tree](images/Bonsai_GS_V1.png)
-
-# Performance Analysis
-Similar to last homework, it seems somewhat irelivant to do performance analysis on an implementation that is very obviously not correct and will be changed. That being said, I did do a bit of testing. For both the clean bike scene and the bonsai scene, the point cloud rendering got a pretty consistent 60 fps regarless of zoom or movement.  I don't have a clear reason as to why this may be happening, but it might be due to the size of the quads taking up more screen space and the number of splats being drawn changing rapidly.
-
-When trying to test different work group sizes, something with the culling/indexing wen wild and many of the splats would flash. 
-
-### Credits
+## Credits
 
 - [Vite](https://vitejs.dev/)
 - [tweakpane](https://tweakpane.github.io/docs//v3/monitor-bindings/)
 - [stats.js](https://github.com/mrdoob/stats.js)
 - [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
-- Special Thanks to: Shrek Shao (Google WebGPU team) & [Differential Guassian Renderer](https://github.com/graphdeco-inria/diff-gaussian-rasterization)
-
+- [Differential Gaussian Renderer](https://github.com/graphdeco-inria/diff-gaussian-rasterization)
+- [3D Gaussian Splatting paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf)
+- Special thanks to: Shrek Shao (Google WebGPU team)
